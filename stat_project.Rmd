@@ -1,0 +1,114 @@
+---
+title: "Stat_project"
+author: "Stefano Minto"
+date: "6/28/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+
+## Introduction
+Proteins are biological entity that are composed of amino acids, there are 21 amino acids and differs each other for different properties such as charge and size. A protein assume a specific structure in the 3d space, that structure is known tend to reach the minimum energy of fold and that particular conformation is called native, that process is driven by interaction bonds that are:
+*H-bond
+*Van der Waals interactions (VDW)
+*Disulfide bridges (SBOND)
+*Salt bridges (IONIC)
+*π-π stacking (PIPISTACK)
+*π-cation (PICATION)
+they differ from each other principally for the strength.
+The goal of this project is try to infer what type of interaction exist between two amino acids that are in contact in a 3d structure of a protein given particular features that describe some properties of the amin oacid when it interacts with other amino acids of the protein.
+
+## Obtaining data
+```{r, include=FALSE}
+data = read.table(file = 'aa_features.tsv', sep = '\t', header = TRUE)
+``` 
+the data coming from a little database of pdb.file composed of 1807 pdb file where each pdb contain the information for the respective protein. With a python script that process all these pdb file and create a dataframe with different features where each row consist of two amino acid that are in contact (with a treshold of ...) thanks to the fact that the pdb file also contain the 3d coordinate for each amino acid, the features extracted are these:
+
+
+
+
+## Clean and filter data
+We did some operation on the data:
+
+1. We eliminate the rows that contain a blank term ('') in Interaction feature, because that means which that interaction wasn't classified for many reason so for reduce the complexity of the problem we eliminate them.
+```{r, results='hide'}
+data <- data[!(data$Interaction == ""), ]
+```
+2. choose these features:
+**'s_rsa', 's_up', 's_down', 's_phi', 's_psi', 's_a1', 's_a2', 's_a3', 's_a4', 's_a5',  't_rsa', 't_up', 't_down', 't_phi', 't_psi', 't_a1', 't_a2', 't_a3', 't_a4', 't_a5', Interaction**
+```{r, results='hide'}
+data <- data[, c('s_rsa', 's_up', 's_down', 's_phi', 's_psi', 's_a1', 's_a2', 's_a3', 's_a4', 's_a5',  't_rsa', 't_up', 't_down', 't_phi', 't_psi', 't_a1', 't_a2', 't_a3', 't_a4', 't_a5', 'Interaction')]
+```
+as we can see that features are specular also for the source and target amino acid that are contact thats because as we saw in the introduction every row of the data frame correspond to two amino acids that are in contact.
+We choose that features because they are useful as predictors to build a model the others features that we esclude were more useful for the user to know for example what aminio acids are in contact or from what protein that amino acid come from but they aren't useful for build a predictor.
+Now we give a quick explanation of what explain the features choosen:
+  * rsa : Relative solvent accessibility of the target residue,  has emerged as a commonly used metric describing protein structure in computational molecular biology, with the particular application of exposed residues, it is defined as a residue's solvent accessibility (ASA) normalized by a suitable maximum value for that residue.
+  * up and down: Half sphere exposure , like all solvent exposure measures it measures how buried amino acid residues are in a protein.
+  * phi and psi angles : The alpha carbon (Cα) in the center of each amino acid is held in the main chain by two rotatable bonds. The dihedral (torsion) angles of these bonds are called3 Phi and Psi, that bonds aren't free to rotate because there are electronic and physical constraints.
+  *atchley features(a1,a2,a3,a4,a5): they describe different amino acid characteristic in particular: polarity, secondary structure,molecular volume, codon diversity, and electrostatic charge
+  
+3. Elimanate the rows that contains at least 1 'NaN' value for the selected features.
+```{r}
+data <- na.omit(data)
+```
+
+## Explore the data
+First of all we can note that all selected are numerical and continuos features except for the response Features 'Interaction' that is non ordinal and categorical? 
+
+## Model data
+For feature selection we can do different operations:
+Firsr of all we can analyse the variance of each features:
+```{r}
+sapply(data[,c('s_rsa', 's_up', 's_down', 's_phi', 's_psi', 's_a1', 's_a2', 's_a3', 's_a4', 's_a5',  't_rsa', 't_up', 't_down', 't_phi', 't_psi', 't_a1', 't_a2', 't_a3', 't_a4', 't_a5')], var)
+```
+As we can see self exposure up and down have the highest variance this because that terms are very variable for the structure variability of the proteins, i.e in some proteins an amino acid can be easily more buried than in others for the fact that protein can have very different conformation from each other.
+Another thing that we can notice is that Relative solvent accessibility has a very low variance that means which that feature has very low variability as we can see from its distribution:
+```{r}
+hist(data$s_rsa)
+```
+
+
+This can suggest us to eliminate and also the specular one for the target residue(e.g. t_rsa) because a low variance predictor means that the all value are quite similar to each others and so there aren't very useful as predictor.
+
+Another thing that we can analyse is the correlation between features
+<!-- here we insert the correlation matrix obtained in python for get a better visualization than python command corr(data)-->
+![Correlation matrix](/home/stefar/Documents/stat_learning/project/corr_matrix.png)
+Here we can see that there are variable that are highly correlated, in order to reduce the dimensionality of the features, a threshold of 0.8 was set and variables with a correlation value greater than the threshold (sa5, ta5) were dropped from the traning set. 
+This is because when independent features are highly correlated, change in one variable would result in a change in the other and so the model output fluctuates significantly given small changes.
+We can also watch the correlation between different features to asses the how some features are influenced from others.
+So the features of the data set that remain are:
+```{r}
+data <- data[,c( 's_up', 's_down', 's_phi', 's_psi', 's_a1', 's_a2', 's_a3', 's_a4','t_rsa', 't_up', 't_down', 't_phi', 't_psi', 't_a1', 't_a2', 't_a3', 't_a4')]
+```
+
+From here we choose the models that we will use for train our data, specifically we choosed:
+* Naive Bayes Model: With the Naive Bayes model we left all the features partially selected before and we had these parameters to the test his accuracy.
+Also watch confusion matrix and compute some metrics
+
+* Linear discriminant analysis: Here we do a stepwise feature selection to try to find a good subset of features for our model. Notice that probably we didn't choose the best subset of data because for do that we shoulded trained 2^p models and this wasn't easy to handle by our computer because the shape of our dataset is big(here place the shape of the dataset).
+So the features selected by the stepwise selection are:
+
+
+* Multinomial logistic regression: for this model we tried two different approach to model the data:
+ * We apply the stepwise selection seen before, and the features selected are:
+ 
+ * Then we try a shrinkage approach, and these are the results obtained:
+ 
+ Thing we can place for asses the accuracy are: the confusion matrix
+
+
+
+
+
+
+
+
+

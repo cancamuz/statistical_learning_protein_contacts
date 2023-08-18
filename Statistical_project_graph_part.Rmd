@@ -1,0 +1,119 @@
+---
+title: "Stat_project"
+author: "Stefano Minto"
+date: "6/28/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(MASS)
+library(rlang)
+library(tidyverse)
+library(caret)
+library(plotly)
+library(dplyr)
+theme_set(theme_classic())
+```
+
+```{r, include=FALSE}
+data = read.table(file = 'aa_features.tsv', sep = '\t', header = TRUE)
+``` 
+
+```{r, results='hide'}
+data <- data[!(data$Interaction == ""), ]
+```
+
+```{r}
+chainData <- unique(data[2:3])
+
+interactions <- chainData %>%
+  group_by(s_ch) %>%
+  summarise(n=n()) %>%
+  ungroup()
+
+plot_ly(interactions, 
+  x = ~s_ch,
+  y = ~n,
+  name = "Distribution of the chains",
+  type = "bar") %>% 
+  layout(title = "Distribution of the chains",
+         xaxis = list(title = "Chain"),
+         yaxis = list(title = "Frequency"))
+```
+
+```{r}
+uniqueArt <- unique(data[14:18])
+len <- max(row(data[14:18]))
+
+interactions <- data %>%
+  group_by(s_a1, s_a2, s_a3, s_a4, s_a5) %>%
+  summarise(n=n()) %>%
+  ungroup() %>%
+  mutate(frequency = n/len) %>%
+  arrange(-frequency)
+
+interactionsFirts3 <- interactions %>%
+  head(3)
+
+interactionsLast3 <- interactions %>%
+  arrange(frequency) %>%
+  head(3)
+
+plot_ly(interactionsFirts3, x = ~frequency, y = ~s_a1, type = 'bar', name = 'Polarity') %>% 
+  add_trace(y = ~s_a2, name = 'Secondary structure') %>%  
+  add_trace(y = ~s_a3, name = 'Molecular volume') %>%  
+  add_trace(y = ~s_a4, name = 'Codon diversity') %>%  
+  add_trace(y = ~s_a5, name = 'Electrostatic charge') %>%
+  layout(title = "The most common combination of atchley features", yaxis = list(title = 'Count'), barmode = 'group')
+
+plot_ly(interactionsLast3, x = ~frequency, y = ~s_a1, type = 'bar', name = 'Polarity') %>% 
+  add_trace(y = ~s_a2, name = 'Secondary structure') %>%  
+  add_trace(y = ~s_a3, name = 'Molecular volume') %>%  
+  add_trace(y = ~s_a4, name = 'Codon diversity') %>%   
+  add_trace(y = ~s_a5, name = 'Electrostatic charge') %>%
+  layout(title = "The less common combination of atchley features", yaxis = list(title = 'Count'), barmode = 'group')
+```
+
+
+```{r}
+nChain <- data[2:3] %>%
+  group_by(pdb_id, s_ch) %>%
+  summarise(n = n()) %>%
+  ungroup()
+
+plot_ly(nChain, x = ~s_ch, y = ~n, type = "box", boxpoints = "all",
+              line = list(color = 'rgb(7,40,89)'),
+              marker = list(color = 'rgb(7,40,89)')) %>%
+  layout(boxmode = "group")
+```
+
+```{r}
+data <- data[, c('s_rsa', 's_up', 's_down', 's_phi', 's_psi', 's_a1', 's_a2', 's_a3', 's_a4', 's_a5',  't_rsa', 't_up', 't_down', 't_phi', 't_psi', 't_a1', 't_a2', 't_a3', 't_a4', 't_a5', 'Interaction')]
+```
+
+```{r}
+data <- na.omit(data)
+```
+
+
+```{r}
+#hist(data$s_rsa)
+
+interactions <- data %>%
+  group_by(Interaction) %>%
+  summarise(n=n()) %>%
+  ungroup()
+
+plot_ly(interactions, 
+  x = ~Interaction,
+  y = ~n,
+  name = "Distribution of the interactions",
+  type = "bar") %>% 
+  layout(title = "Distribution of the interactions",
+         xaxis = list(title = "Interaction"),
+         yaxis = list(title = "Frequency"))
+```
